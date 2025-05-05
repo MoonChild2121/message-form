@@ -111,7 +111,9 @@
 </head>
 <body>
   <div class="logo-header">
-    <div class="logo">🧠</div>
+    <div class="logo">
+      <img src="logo.png" alt="NeuroLinkDX Logo" style="width:40px;height:40px;object-fit:contain;border-radius:50%;" />
+    </div>
     <div>
       <div style="font-size:1.5rem;font-weight:700;color:#4f46e5;">NeuroLink<span style="color:#7c3aed;">DX</span></div>
       <div style="font-size:1rem;color:#555;">Peer Review Request</div>
@@ -159,9 +161,7 @@
       }
       el.innerHTML = `
         <div class="card-title">Patient & Session Information</div>
-        <div class="info-row"><span class="info-label">Name:</span> ${data.first_name} ${data.last_name}</div>
-        <div class="info-row"><span class="info-label">Age:</span> ${data.age}</div>
-        <div class="info-row"><span class="info-label">Gender:</span> ${data.gender}</div>
+        <div class="info-row"><span class="info-label">Patient ID:</span> ${patientId}</div>
         <div class="info-row"><span class="info-label">Reviewer Email:</span> ${receiverEmail}</div>
       `;
     }
@@ -169,7 +169,7 @@
     // --- Fetch and render current diagnosis ---
     async function renderDiagnosisReport() {
       // Fetch latest diagnosis for this patient
-      const { data, error } = await supabase
+      const { data: diagnosis, error } = await supabase
         .from('diagnosis')
         .select('*')
         .eq('patient_id', patientId)
@@ -177,28 +177,51 @@
         .limit(1)
         .single();
       const el = document.getElementById('diagnosis-report');
-      if (error || !data) {
+      if (error || !diagnosis) {
         el.innerHTML = '<div class="error status">Could not load diagnosis report.</div>';
         return;
       }
+
+      // Fetch genotype if available
+      let genotype = 'N/A';
+      if (diagnosis.genotype) {
+        genotype = diagnosis.genotype;
+      } else {
+        // Try to fetch from genetic_tests table if not present in diagnosis
+        const { data: genetic, error: genError } = await supabase
+          .from('genetic_tests')
+          .select('genotype')
+          .eq('patient_id', patientId)
+          .maybeSingle();
+        if (genetic && genetic.genotype) genotype = genetic.genotype;
+      }
+
       el.innerHTML = `
         <div class="card-title">Current AI Diagnosis</div>
         <table class="diagnosis-table">
           <tr>
             <th>Diagnosis</th>
+            <th>MMSE</th>
+            <th>CDR Global</th>
+            <th>CDR-SB</th>
+            <th>Genotype</th>
             <th>CN %</th>
             <th>MCI %</th>
             <th>AD %</th>
           </tr>
           <tr>
-            <td>${data.diagnosis_result}</td>
-            <td>${(data.probability_cn * 100).toFixed(2)}%</td>
-            <td>${(data.probability_mci * 100).toFixed(2)}%</td>
-            <td>${(data.probability_ad * 100).toFixed(2)}%</td>
+            <td>${diagnosis.diagnosis_result}</td>
+            <td>${diagnosis.mmse ?? 'N/A'}</td>
+            <td>${diagnosis.cdglobal ?? diagnosis.cdrglobal ?? 'N/A'}</td>
+            <td>${diagnosis.cdrsb ?? 'N/A'}</td>
+            <td>${genotype}</td>
+            <td>${(diagnosis.probability_cn * 100).toFixed(2)}%</td>
+            <td>${(diagnosis.probability_mci * 100).toFixed(2)}%</td>
+            <td>${(diagnosis.probability_ad * 100).toFixed(2)}%</td>
           </tr>
         </table>
         <div style="margin-top:8px;color:#4b5563;">
-          <strong>Uncertainty statement:</strong> Model confidence for MCI is ${(data.probability_mci * 100).toFixed(2)}%; moderate uncertainty remains for AD. Use in conjunction with clinical judgment.
+          <strong>Uncertainty statement:</strong> Model confidence for MCI is ${(diagnosis.probability_mci * 100).toFixed(2)}%; moderate uncertainty remains for AD. Use in conjunction with clinical judgment.
         </div>
       `;
     }
@@ -213,6 +236,7 @@
       const el = document.getElementById('prev-diagnoses');
       if (error || !data || data.length < 2) {
         el.innerHTML = '';
+        el.style.display = 'none'; // Hide the card if empty
         return;
       }
       // Deduplicate logic (like in Diagnosis.tsx)
@@ -222,21 +246,24 @@
         mmse: row.mmse ?? null,
         cdglobal: row.cdglobal ?? row.cdrglobal ?? null,
         cdrsb: row.cdrsb ?? null,
+        genotype: row.genotype ?? 'N/A',
       }));
       const filtered = mapped.filter(row => row.age !== null && row.mmse !== null && row.cdglobal !== null && row.cdrsb !== null);
       const unique = [];
       let last = null;
       for (const row of filtered) {
-        const tuple = [row.age, row.mmse, row.cdglobal, row.cdrsb].join('|');
-        if (!last || tuple !== [last.age, last.mmse, last.cdglobal, last.cdrsb].join('|')) {
+        const tuple = [row.age, row.mmse, row.cdglobal, row.cdrsb, row.genotype].join('|');
+        if (!last || tuple !== [last.age, last.mmse, last.cdglobal, last.cdrsb, last.genotype].join('|')) {
           unique.push(row);
           last = row;
         }
       }
       if (unique.length < 2) {
         el.innerHTML = '';
+        el.style.display = 'none';
         return;
       }
+      el.style.display = '';
       el.innerHTML = `
         <div class="card-title">Previous AI Diagnoses</div>
         <table class="prev-table">
@@ -246,6 +273,7 @@
             <th>MMSE</th>
             <th>CDR Global</th>
             <th>CDR-SB</th>
+            <th>Genotype</th>
             <th>Diagnosis</th>
             <th>CN %</th>
             <th>MCI %</th>
@@ -258,6 +286,7 @@
               <td>${row.mmse ?? 'N/A'}</td>
               <td>${row.cdglobal ?? 'N/A'}</td>
               <td>${row.cdrsb ?? 'N/A'}</td>
+              <td>${row.genotype ?? 'N/A'}</td>
               <td>${row.diagnosis_result ?? 'N/A'}</td>
               <td>${row.probability_cn !== undefined ? (row.probability_cn * 100).toFixed(2) + '%' : 'N/A'}</td>
               <td>${row.probability_mci !== undefined ? (row.probability_mci * 100).toFixed(2) + '%' : 'N/A'}</td>
