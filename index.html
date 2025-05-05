@@ -72,34 +72,49 @@
 
     const statusEl = document.getElementById('status');
     
+    // Parse URL params
+    const params = new URLSearchParams(window.location.search);
+    const clinicianId = params.get('clinician_id');
+    const patientId = params.get('patient_id');
+    const requestId = params.get('request_id');
+    const receiverEmail = params.get('receiver_email');
+
+    // Render values
+    document.body.insertAdjacentHTML('afterbegin', `
+      <div style="background:#f3f3f3;padding:10px;border-radius:6px;margin-bottom:16px;">
+        <strong>Requester Clinician ID:</strong> ${clinicianId || ''}<br>
+        <strong>Patient ID:</strong> ${patientId || ''}<br>
+        <strong>Receiver Email:</strong> ${receiverEmail || ''}<br>
+        <strong>Request ID:</strong> ${requestId || ''}
+      </div>
+    `);
+
     // Handle form submission
     document.getElementById('messageForm').addEventListener('submit', async function(event) {
       event.preventDefault();
-
-      const message = document.getElementById('message').value;
-      
-      statusEl.textContent = 'Sending message...';
+      const feedback = document.getElementById('message').value;
+      statusEl.textContent = 'Sending feedback...';
       statusEl.className = 'sending';
-      
+
       try {
         const { data, error } = await supabase
-          .from('messages')
-          .insert([
-            { message: message }
-          ]);
+          .from('peer_review_requests')
+          .update({
+            feedback: feedback,
+            date_replied: new Date().toISOString(),
+            status: 'completed'
+          })
+          .eq('id', requestId);
 
         if (error) {
-          console.error(error);
           statusEl.textContent = '❌ Error: ' + error.message;
           statusEl.className = 'error';
         } else {
-          statusEl.textContent = '✅ Message successfully added!';
+          statusEl.textContent = '✅ Feedback submitted!';
           statusEl.className = 'success';
           document.getElementById('messageForm').reset();
-          loadMessages(); // Refresh the messages display
         }
       } catch (err) {
-        console.error(err);
         statusEl.textContent = '❌ Error: ' + err.message;
         statusEl.className = 'error';
       }
