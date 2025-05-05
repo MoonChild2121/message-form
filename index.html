@@ -148,10 +148,10 @@
 
     // --- Fetch and render patient info ---
     async function renderPatientInfo() {
-      // Fetch patient info (hide patient_id)
+      // Fetch patient info (hide patient name)
       const { data, error } = await supabase
         .from('patients')
-        .select('age, gender, first_name, last_name')
+        .select('age, gender')
         .eq('pt_id', patientId)
         .single();
       const el = document.getElementById('patient-info');
@@ -162,6 +162,8 @@
       el.innerHTML = `
         <div class="card-title">Patient & Session Information</div>
         <div class="info-row"><span class="info-label">Patient ID:</span> ${patientId}</div>
+        <div class="info-row"><span class="info-label">Age:</span> ${data.age ?? 'N/A'}</div>
+        <div class="info-row"><span class="info-label">Gender:</span> ${data.gender ?? 'N/A'}</div>
         <div class="info-row"><span class="info-label">Reviewer Email:</span> ${receiverEmail}</div>
       `;
     }
