@@ -98,7 +98,7 @@
 
       try {
         const { data, error } = await supabase
-          .from('peer_review_requests')
+          .from('peer_review_public')
           .update({
             feedback: feedback,
             date_replied: new Date().toISOString(),
