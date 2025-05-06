@@ -189,11 +189,13 @@
       if (diagnosis.genotype) {
         genotype = diagnosis.genotype;
       } else {
-        // Try to fetch from genetic_tests table if not present in diagnosis
+        // Fetch the latest genetic test by created_at
         const { data: genetic, error: genError } = await supabase
           .from('genetic_tests')
           .select('genotype')
           .eq('patient_id', patientId)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .maybeSingle();
         if (genetic && genetic.genotype) genotype = genetic.genotype;
       }
