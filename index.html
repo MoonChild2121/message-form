@@ -178,6 +178,8 @@
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
+      console.log('Diagnosis fetch:', { diagnosis, error });
+
       const el = document.getElementById('diagnosis-report');
       if (error || !diagnosis) {
         el.innerHTML = '<div class="error status">Could not load diagnosis report.</div>';
@@ -188,6 +190,7 @@
       let genotype = 'N/A';
       if (diagnosis.genotype) {
         genotype = diagnosis.genotype;
+        console.log('Genotype from diagnosis:', genotype);
       } else {
         // Fetch the latest genetic test by created_at
         const { data: genetic, error: genError } = await supabase
@@ -197,6 +200,7 @@
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+        console.log('Genetic test fetch:', { genetic, genError });
         if (genetic && genetic.genotype) genotype = genetic.genotype;
       }
 
